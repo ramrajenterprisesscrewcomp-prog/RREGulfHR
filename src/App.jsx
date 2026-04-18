@@ -11,9 +11,11 @@ import LoginScreen, { isLoggedIn } from './components/LoginScreen'
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn)
-
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
+  return <AppMain />
+}
 
+function AppMain() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [candidates, setCandidates] = useState(initialCandidates)
   const [interviews, setInterviews] = useState(initialInterviews)
