@@ -1,4 +1,6 @@
-// All Sheets/Drive calls go through the backend — no Google OAuth needed
+// Sheets/Drive: service account via backend; Drive uploads: browser OAuth (user's quota)
+
+import { uploadToDrive } from './driveUploadService'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -28,26 +30,8 @@ export const api = {
   readTab:  (name)        => req('GET',  `/tabs/${name}`),
   writeTab: (name, rows)  => req('POST', `/tabs/${name}`, { rows }),
 
-  // File upload — uses Cloudinary if configured, otherwise backend Drive
-  uploadFile: async (file, meta = {}) => {
-    const cloudName   = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
-    if (cloudName && uploadPreset) {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('upload_preset', uploadPreset)
-      fd.append('folder', `rre-hr/${meta.jobRole || 'resumes'}`)
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, { method: 'POST', body: fd })
-      const json = await res.json()
-      if (json.error) throw new Error(json.error.message)
-      return { ok: true, url: json.secure_url }
-    }
-    // Fallback to backend Drive upload
-    const fd = new FormData()
-    fd.append('file', file)
-    Object.entries(meta).forEach(([k, v]) => v && fd.append(k, v))
-    return req('POST', '/drive/upload', fd, true)
-  },
+  // Drive upload via browser OAuth — files stored in user's Drive (no quota issues)
+  uploadFile: (file, meta = {}) => uploadToDrive(file, meta),
 
   health: () => req('GET', '/health'),
 }
