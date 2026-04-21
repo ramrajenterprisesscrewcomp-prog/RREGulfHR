@@ -28,8 +28,21 @@ export const api = {
   readTab:  (name)        => req('GET',  `/tabs/${name}`),
   writeTab: (name, rows)  => req('POST', `/tabs/${name}`, { rows }),
 
-  // Drive upload — accepts a File object
-  uploadFile: (file, meta = {}) => {
+  // File upload — uses Cloudinary if configured, otherwise backend Drive
+  uploadFile: async (file, meta = {}) => {
+    const cloudName   = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+    if (cloudName && uploadPreset) {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('upload_preset', uploadPreset)
+      fd.append('folder', `rre-hr/${meta.jobRole || 'resumes'}`)
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, { method: 'POST', body: fd })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error.message)
+      return { ok: true, url: json.secure_url }
+    }
+    // Fallback to backend Drive upload
     const fd = new FormData()
     fd.append('file', file)
     Object.entries(meta).forEach(([k, v]) => v && fd.append(k, v))
