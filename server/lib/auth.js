@@ -1,10 +1,19 @@
 const { google } = require('googleapis')
 
-const auth = new google.auth.GoogleAuth({
-  credentials: {
+// Support both a full JSON blob (GOOGLE_SERVICE_ACCOUNT_JSON) and
+// individual vars (GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY)
+let credentials
+if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+} else {
+  credentials = {
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-  },
+  }
+}
+
+const auth = new google.auth.GoogleAuth({
+  credentials,
   scopes: [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive',
