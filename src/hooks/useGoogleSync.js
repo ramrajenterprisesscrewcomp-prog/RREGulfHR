@@ -136,7 +136,7 @@ export function useGoogleSync() {
           const { url } = await api.uploadFile(file, { jobRole: final.role })
           final.resume_url = url
         } catch (e) {
-          console.warn('Resume upload skipped:', e.message)
+          setError(`Resume upload failed: ${e.message}`)
         }
       }
       await api.addCandidate(final)

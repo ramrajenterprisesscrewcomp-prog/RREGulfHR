@@ -20,19 +20,22 @@ function loadGIS() {
 
 async function getToken() {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken
+  if (!CLIENT_ID) throw new Error('Google Client ID not configured — add VITE_GOOGLE_CLIENT_ID in Vercel env vars')
   await loadGIS()
   return new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: DRIVE_SCOPE,
       callback: (resp) => {
-        if (resp.error) return reject(new Error(resp.error_description || resp.error))
+        if (resp.error) return reject(new Error(resp.error_description || resp.error_description || resp.error))
         cachedToken = resp.access_token
         tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000
         resolve(cachedToken)
       },
+      error_callback: (err) => reject(new Error(err.message || 'Google auth failed')),
     })
-    client.requestAccessToken({ prompt: '' })
+    // No prompt override — let Google show popup naturally on first use
+    client.requestAccessToken()
   })
 }
 
