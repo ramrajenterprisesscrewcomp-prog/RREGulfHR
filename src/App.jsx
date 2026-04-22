@@ -79,24 +79,11 @@ function AppMain() {
   const handleCloseDrawer = useCallback(() => setDrawerCandidate(null), [])
 
   // ── Candidate CRUD + Google Sync ─────────────────────────────────────────────
-  const handleAddCandidate = useCallback((candidate, file) => {
-    // Strip the _resumeFile helper property before storing in state
+  const handleAddCandidate = useCallback((candidate) => {
     const { _resumeFile, ...clean } = candidate
-    const actualFile = file || _resumeFile || null
-
-    // Add to local state immediately so UI is instant
     setCandidates((prev) => [clean, ...prev])
-
-    // Background sync: append to Sheets + upload resume to Drive
     if (googleSync.connected) {
-      googleSync.syncAdd(clean, actualFile).then((synced) => {
-        // If Drive upload gave us a real URL, update the candidate in state
-        if (synced.resume_url && synced.resume_url !== clean.resume_url) {
-          setCandidates((prev) =>
-            prev.map((c) => (c.id === synced.id ? { ...c, resume_url: synced.resume_url } : c))
-          )
-        }
-      }).catch(console.warn)
+      googleSync.syncAdd(clean).catch(console.warn)
     }
   }, [googleSync])
 
