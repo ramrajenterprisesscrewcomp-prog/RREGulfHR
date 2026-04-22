@@ -28,19 +28,11 @@ export const api = {
   readTab:  (name)        => req('GET',  `/tabs/${name}`),
   writeTab: (name, rows)  => req('POST', `/tabs/${name}`, { rows }),
 
-  // Resume upload via Cloudinary — no OAuth, no quota issues, always connected
-  uploadFile: async (file, meta = {}) => {
-    const cloud  = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-    const preset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
-    if (!cloud || !preset) throw new Error('Cloudinary not configured (VITE_CLOUDINARY_CLOUD_NAME / VITE_CLOUDINARY_UPLOAD_PRESET missing)')
+  uploadFile: (file, meta = {}) => {
     const fd = new FormData()
     fd.append('file', file)
-    fd.append('upload_preset', preset)
-    fd.append('folder', `rre-hr/${meta.jobRole || 'resumes'}`)
-    const res  = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/auto/upload`, { method: 'POST', body: fd })
-    const json = await res.json()
-    if (json.error) throw new Error(json.error.message)
-    return { ok: true, url: json.secure_url }
+    Object.entries(meta).forEach(([k, v]) => v && fd.append(k, v))
+    return req('POST', '/drive/upload', fd, true)
   },
 
   fetchAll: () => req('GET', '/data/all'),
