@@ -1,4 +1,6 @@
-// Sheets via service account backend; file uploads via Cloudinary (no OAuth needed)
+// Sheets via service account backend; file uploads via user OAuth → their Drive
+
+import { uploadToDrive } from './driveUploadService'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -28,12 +30,7 @@ export const api = {
   readTab:  (name)        => req('GET',  `/tabs/${name}`),
   writeTab: (name, rows)  => req('POST', `/tabs/${name}`, { rows }),
 
-  uploadFile: (file, meta = {}) => {
-    const fd = new FormData()
-    fd.append('file', file)
-    Object.entries(meta).forEach(([k, v]) => v && fd.append(k, v))
-    return req('POST', '/drive/upload', fd, true)
-  },
+  uploadFile: (file, meta = {}) => uploadToDrive(file, meta),
 
   fetchAll: () => req('GET', '/data/all'),
 
