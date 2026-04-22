@@ -1,8 +1,24 @@
-import { useState } from 'react'
-import { Loader, CheckCircle2, AlertCircle, RefreshCw, Menu } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader, CheckCircle2, AlertCircle, RefreshCw, Menu, HardDrive } from 'lucide-react'
+import { authorizeDrive, isDriveAuthorized } from '../services/driveUploadService'
 
 export default function GoogleTopBar({ sync, candidates, onLoadCandidates, onLoadProjects, onLoadInterviews, onLoadDocuments, onMenuClick, isMobile }) {
   const [working, setWorking] = useState(false)
+  const [driveAuthed, setDriveAuthed] = useState(isDriveAuthorized())
+
+  const handleConnectDrive = async () => {
+    try {
+      await authorizeDrive()
+      setDriveAuthed(true)
+    } catch (e) {
+      alert(`Drive auth failed: ${e.message}`)
+    }
+  }
+
+  useEffect(() => {
+    const t = setInterval(() => setDriveAuthed(isDriveAuthorized()), 30000)
+    return () => clearInterval(t)
+  }, [])
 
   const handleRefresh = async () => {
     setWorking(true)
@@ -54,6 +70,19 @@ export default function GoogleTopBar({ sync, candidates, onLoadCandidates, onLoa
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#ef4444', maxWidth: isMobile ? 160 : 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           <AlertCircle size={11} style={{ flexShrink: 0 }} />{sync.error}
         </div>
+      )}
+
+      {/* Drive auth button — shows only when not yet authorized */}
+      {!driveAuthed && import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+        <button onClick={handleConnectDrive} title="Connect Google Drive for resume uploads"
+          style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(79,143,247,0.12)', border: '1px solid rgba(79,143,247,0.3)', borderRadius: 6, color: '#4f8ff7', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '3px 10px', fontFamily: 'DM Sans, sans-serif' }}>
+          <HardDrive size={12} /> Connect Drive
+        </button>
+      )}
+      {driveAuthed && (
+        <span style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <HardDrive size={12} /> Drive ✓
+        </span>
       )}
 
       <button onClick={handleRefresh} disabled={sync.syncing || working} title="Refresh from sheet"

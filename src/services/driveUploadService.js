@@ -65,6 +65,17 @@ async function getOrCreateFolder(parentId, name) {
   return json.id
 }
 
+// Call this directly from a button click to pre-authorize before uploading
+export async function authorizeDrive() {
+  cachedToken = null   // force fresh auth
+  tokenExpiry = 0
+  return getToken()
+}
+
+export function isDriveAuthorized() {
+  return Boolean(cachedToken && Date.now() < tokenExpiry)
+}
+
 export async function uploadToDrive(file, meta = {}) {
   if (!CLIENT_ID) throw new Error('VITE_GOOGLE_CLIENT_ID not set')
   if (!FOLDER_ID) throw new Error('VITE_GOOGLE_DRIVE_FOLDER_ID not set')
