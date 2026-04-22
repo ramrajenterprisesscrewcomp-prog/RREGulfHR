@@ -78,16 +78,28 @@ export function isDriveAuthorized() {
 
 export async function uploadToDrive(file, meta = {}) {
   if (!CLIENT_ID) throw new Error('VITE_GOOGLE_CLIENT_ID not set')
-  if (!FOLDER_ID) throw new Error('VITE_GOOGLE_DRIVE_FOLDER_ID not set')
 
   const token = await getToken()
 
-  // Build subfolder path: RRE HR / jobRole / candidateName
-  let parentId = FOLDER_ID
-  if (meta.jobRole)       parentId = await getOrCreateFolder(parentId, meta.jobRole)
+  // Try to upload into the configured folder; fall back to Drive root if inaccessible
+  let parents = []
+  if (FOLDER_ID) {
+    try {
+      // Verify folder is accessible before using it as parent
+      const check = await fetch(`https://www.googleapis.com/drive/v3/files/${FOLDER_ID}?fields=id&supportsAllDrives=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const checkJson = await check.json()
+      if (!checkJson.error) {
+        let parentId = FOLDER_ID
+        if (meta.jobRole) parentId = await getOrCreateFolder(parentId, meta.jobRole)
+        parents = [parentId]
+      }
+    } catch (_) { /* fall through to root upload */ }
+  }
 
   // Multipart upload
-  const metadata = { name: file.name, parents: [parentId] }
+  const metadata = { name: file.name, ...(parents.length ? { parents } : {}) }
   const form = new FormData()
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
   form.append('file', file)
