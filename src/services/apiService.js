@@ -43,5 +43,7 @@ export const api = {
     return { ok: true, url: json.secure_url }
   },
 
+  fetchAll: () => req('GET', '/data/all'),
+
   health: () => req('GET', '/health'),
 }

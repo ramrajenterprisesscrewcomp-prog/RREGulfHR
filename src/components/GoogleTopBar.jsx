@@ -7,16 +7,12 @@ export default function GoogleTopBar({ sync, candidates, onLoadCandidates, onLoa
   const handleRefresh = async () => {
     setWorking(true)
     try {
-      const [data, projects, ivs, docs] = await Promise.all([
-        sync.fetchCandidates(),
-        sync.fetchProjects(),
-        sync.fetchInterviews(),
-        sync.fetchDocuments(),
-      ])
-      if (data?.length)     onLoadCandidates?.(data)
-      if (projects?.length) onLoadProjects?.(projects)
-      if (ivs?.length)      onLoadInterviews?.(ivs)
-      if (docs)             onLoadDocuments?.(docs)
+      const d = await sync.fetchAll()
+      if (!d) return
+      if (d.candidates?.length) onLoadCandidates?.(d.candidates)
+      if (d.projects?.length)   onLoadProjects?.(d.projects)
+      if (d.interviews?.length) onLoadInterviews?.(d.interviews)
+      if (d.docs || d.checklist) onLoadDocuments?.(d)
     } finally { setWorking(false) }
   }
 

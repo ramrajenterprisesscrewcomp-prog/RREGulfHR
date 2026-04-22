@@ -42,21 +42,23 @@ function AppMain() {
     if (result?.checklist) setDocChecklist(result.checklist)
   }, [])
 
-  // ── Auto-load all data on silent reconnect (page refresh with saved token) ───
+  // ── Auto-load all data on connect — single batchGet, 60s throttle ───────────
   const autoLoadDone = useRef(false)
+  const lastFetch    = useRef(0)
   useEffect(() => {
     if (!googleSync.connected) { autoLoadDone.current = false; return }
     if (autoLoadDone.current) return
+    const now = Date.now()
+    if (now - lastFetch.current < 60_000) return   // throttle: max once per minute
     autoLoadDone.current = true
-    // Candidates already loaded by GoogleTopBar's handleConnect on explicit connect.
-    // This branch fires only for silent auto-reconnect (no button click).
-    googleSync.fetchCandidates().then((list) => { if (list?.length) setCandidates(list) }).catch(() => {})
-    googleSync.fetchProjects().then((p)     => { if (p?.length)    setProjects(p)    }).catch(() => {})
-    googleSync.fetchInterviews().then((ivs) => { if (ivs?.length)  setInterviews(ivs)}).catch(() => {})
-    googleSync.fetchDocuments().then((result) => {
-      if (!result) return
-      if (result.docs?.length)      setDocuments(result.docs)
-      if (result.checklist && Object.keys(result.checklist).length) setDocChecklist(result.checklist)
+    lastFetch.current = now
+    googleSync.fetchAll().then((d) => {
+      if (!d) return
+      if (d.candidates?.length) setCandidates(d.candidates)
+      if (d.projects?.length)   setProjects(d.projects)
+      if (d.interviews?.length) setInterviews(d.interviews)
+      if (d.docs?.length)       setDocuments(d.docs)
+      if (d.checklist && Object.keys(d.checklist).length) setDocChecklist(d.checklist)
     }).catch(() => {})
   }, [googleSync.connected])
 

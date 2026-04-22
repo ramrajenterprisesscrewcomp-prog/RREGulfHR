@@ -106,6 +106,18 @@ export function useGoogleSync() {
     } finally { setSyncing(false) }
   }, [])
 
+  // ── Batch fetch all tabs in one API call ─────────────────────────────────────
+  const fetchAll = useCallback(() =>
+    run(async () => {
+      const res = await api.fetchAll()
+      return {
+        candidates: res.candidates || [],
+        projects:   parseProjectsFromRows(res.projectRows || []),
+        interviews: parseInterviewsFromRows(res.interviewRows || []),
+        ...parseDocumentsFromRows(res.documentRows || []),
+      }
+    }), [run])
+
   // ── Candidates ───────────────────────────────────────────────────────────────
   const fetchCandidates = useCallback(() =>
     run(async () => {
@@ -212,7 +224,7 @@ export function useGoogleSync() {
     hasConfig: true,
     connect:    async () => { const ok = await api.health().then(() => true).catch(() => false); setConnected(ok) },
     disconnect: () => setConnected(false),
-    fetchCandidates, exportAll,
+    fetchAll, fetchCandidates, exportAll,
     syncAdd, syncAddMany, syncUpdate, syncDelete,
     syncAddProject, syncUpdateProject, syncDeleteProject,
     fetchProjects, fetchInterviews, syncInterviews,

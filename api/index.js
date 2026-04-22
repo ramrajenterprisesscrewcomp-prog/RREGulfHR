@@ -19,6 +19,7 @@ app.use((req, _res, next) => {
 app.use('/api/candidates', require('../server/routes/candidates'))
 app.use('/api/tabs',       require('../server/routes/tabs'))
 app.use('/api/drive',      require('../server/routes/drive'))
+app.use('/api/data',       require('../server/routes/data'))
 
 app.get('/api/health', (_req, res) => {
   res.json({

@@ -168,4 +168,29 @@ async function writeTab(tabName, rows) {
   }
 }
 
-module.exports = { getCandidates, addCandidate, updateCandidate, deleteCandidate, bulkSetCandidates, readTab, writeTab }
+// Fetch all tabs in one batchGet call — saves quota (4 reads → 1)
+async function batchReadAll() {
+  const sheets = await getSheetsClient()
+  const ranges = [
+    `${CAND_SHEET}!A${DATA_ROW}:O`,
+    'Projects!A1:ZZ',
+    'Interviews!A1:ZZ',
+    'Documents!A1:ZZ',
+  ]
+  let values
+  try {
+    const res = await sheets.spreadsheets.values.batchGet({ spreadsheetId: SHEET_ID, ranges })
+    values = res.data.valueRanges.map((r) => r.values || [])
+  } catch {
+    values = [[], [], [], []]
+  }
+  const [candRows, projectRows, interviewRows, documentRows] = values
+  return {
+    candidates:  candRows.filter((r) => r[0]).map(rowToObj),
+    projectRows,
+    interviewRows,
+    documentRows,
+  }
+}
+
+module.exports = { getCandidates, addCandidate, updateCandidate, deleteCandidate, bulkSetCandidates, readTab, writeTab, batchReadAll }
