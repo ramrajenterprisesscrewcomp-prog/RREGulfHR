@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Search, Plus, Upload, Download, ChevronUp, ChevronDown, X, SlidersHorizontal, Trash2, Eye, EyeOff, ExternalLink, FileText, Mail } from 'lucide-react'
+import { Search, Plus, Upload, Download, ChevronUp, ChevronDown, X, SlidersHorizontal, Trash2, Eye, EyeOff, ExternalLink, FileText, Mail, FileDown } from 'lucide-react'
 import StatusBadge from './StatusBadge'
 import AddCandidateModal from './AddCandidateModal'
 import BulkUploadModal from './BulkUploadModal'
@@ -103,6 +103,43 @@ export default function Candidates({
     onClearExternalFilter()
   }
 
+  const exportPDF = () => {
+    const rows = filtered.map((c) => `
+      <tr>
+        <td>${c.name || '—'}</td>
+        <td>${c.phone || '—'}</td>
+        <td>${c.email || '—'}</td>
+        <td>${c.role || '—'}</td>
+        <td>${c.experience || '—'}</td>
+      </tr>`).join('')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>RRE HR — Candidates</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 32px; color: #111; }
+        h2 { font-size: 18px; margin-bottom: 4px; }
+        p  { font-size: 12px; color: #666; margin: 0 0 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #1a2133; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }
+        td { padding: 9px 12px; border-bottom: 1px solid #e5e7eb; }
+        tr:nth-child(even) td { background: #f9fafb; }
+        @media print { body { margin: 16px; } }
+      </style></head><body>
+      <h2>RRE HR Consultancy — Candidate List</h2>
+      <p>Exported on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} · ${filtered.length} candidate${filtered.length !== 1 ? 's' : ''}</p>
+      <table>
+        <thead><tr><th>Name</th><th>Contact Number</th><th>Email ID</th><th>Role</th><th>Experience</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      </body></html>`
+
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => { win.print() }, 400)
+  }
+
   const toggleSort = (field) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortField(field); setSortDir('asc') }
@@ -171,6 +208,15 @@ export default function Candidates({
               onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(167,139,250,0.12)'}
             >
               <Upload size={15} /> Bulk Upload
+            </button>
+            <button
+              onClick={exportPDF}
+              title={`Export ${filtered.length} candidate${filtered.length !== 1 ? 's' : ''} to PDF`}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 16px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 10, color: '#fbbf24', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(251,191,36,0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(251,191,36,0.1)'}
+            >
+              <FileDown size={15} /> Export PDF
             </button>
             <button
               onClick={() => setShowModal(true)}
