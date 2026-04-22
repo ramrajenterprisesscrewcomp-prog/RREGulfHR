@@ -18,8 +18,8 @@ function loadGIS() {
   })
 }
 
-async function getToken() {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken
+async function getToken(forceConsent = false) {
+  if (!forceConsent && cachedToken && Date.now() < tokenExpiry) return cachedToken
   if (!CLIENT_ID) throw new Error('Google Client ID not configured — add VITE_GOOGLE_CLIENT_ID in Vercel env vars')
   await loadGIS()
   return new Promise((resolve, reject) => {
@@ -27,15 +27,15 @@ async function getToken() {
       client_id: CLIENT_ID,
       scope: DRIVE_SCOPE,
       callback: (resp) => {
-        if (resp.error) return reject(new Error(resp.error_description || resp.error_description || resp.error))
+        if (resp.error) return reject(new Error(resp.error_description || resp.error))
         cachedToken = resp.access_token
         tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000
         resolve(cachedToken)
       },
       error_callback: (err) => reject(new Error(err.message || 'Google auth failed')),
     })
-    // No prompt override — let Google show popup naturally on first use
-    client.requestAccessToken()
+    // Force consent screen so user picks account and grants full drive scope
+    client.requestAccessToken(forceConsent ? { prompt: 'consent' } : {})
   })
 }
 
@@ -69,7 +69,7 @@ async function getOrCreateFolder(parentId, name) {
 export async function authorizeDrive() {
   cachedToken = null   // force fresh auth
   tokenExpiry = 0
-  return getToken()
+  return getToken(true)  // true = force consent screen so user picks account + grants full drive scope
 }
 
 export function isDriveAuthorized() {
