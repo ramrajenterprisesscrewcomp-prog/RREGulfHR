@@ -9,6 +9,12 @@ import { useGoogleSync } from './hooks/useGoogleSync'
 import GoogleTopBar from './components/GoogleTopBar'
 import { useIsMobile } from './hooks/useWindowSize'
 
+// ── localStorage helpers ──────────────────────────────────────────────────────
+const LS = {
+  get: (key, fallback) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback } },
+  set: (key, val)      => { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} },
+}
+
 export default function App() {
   return <AppMain />
 }
@@ -17,13 +23,20 @@ function AppMain() {
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [candidates, setCandidates] = useState(initialCandidates)
-  const [interviews, setInterviews] = useState(initialInterviews)
-  const [projects, setProjects] = useState(initialProjects)
-  const [documents, setDocuments] = useState([])
-  const [docChecklist, setDocChecklist] = useState({})
+  const [candidates, setCandidates] = useState(() => LS.get('rre_candidates', initialCandidates))
+  const [interviews, setInterviews] = useState(() => LS.get('rre_interviews', initialInterviews))
+  const [projects,   setProjects]   = useState(() => LS.get('rre_projects',   initialProjects))
+  const [documents,  setDocuments]  = useState(() => LS.get('rre_documents',  []))
+  const [docChecklist, setDocChecklist] = useState(() => LS.get('rre_checklist', {}))
   const [drawerCandidate, setDrawerCandidate] = useState(null)
   const [candidateFilter, setCandidateFilter] = useState({ status: '', category: '' })
+
+  // ── Auto-save to localStorage on every change ────────────────────────────────
+  useEffect(() => { LS.set('rre_candidates', candidates) }, [candidates])
+  useEffect(() => { LS.set('rre_interviews', interviews) }, [interviews])
+  useEffect(() => { LS.set('rre_projects',   projects)   }, [projects])
+  useEffect(() => { LS.set('rre_documents',  documents)  }, [documents])
+  useEffect(() => { LS.set('rre_checklist',  docChecklist) }, [docChecklist])
 
   // ── Google Sheets + Drive sync ───────────────────────────────────────────────
   const googleSync = useGoogleSync()
