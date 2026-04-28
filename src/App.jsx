@@ -15,6 +15,11 @@ const LS = {
   set: (key, val)      => { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} },
 }
 
+function dedupeById(arr) {
+  const seen = new Set()
+  return (arr || []).filter((x) => { if (!x?.id || seen.has(x.id)) return false; seen.add(x.id); return true })
+}
+
 export default function App() {
   return <AppMain />
 }
@@ -23,9 +28,9 @@ function AppMain() {
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [candidates, setCandidates] = useState(() => LS.get('rre_candidates', initialCandidates))
-  const [interviews, setInterviews] = useState(() => LS.get('rre_interviews', initialInterviews))
-  const [projects,   setProjects]   = useState(() => LS.get('rre_projects',   initialProjects))
+  const [candidates, setCandidates] = useState(() => dedupeById(LS.get('rre_candidates', initialCandidates)))
+  const [interviews, setInterviews] = useState(() => dedupeById(LS.get('rre_interviews', initialInterviews)))
+  const [projects,   setProjects]   = useState(() => dedupeById(LS.get('rre_projects',   initialProjects)))
   const [documents,  setDocuments]  = useState(() => LS.get('rre_documents',  []))
   const [docChecklist, setDocChecklist] = useState(() => LS.get('rre_checklist', {}))
   const [drawerCandidate, setDrawerCandidate] = useState(null)

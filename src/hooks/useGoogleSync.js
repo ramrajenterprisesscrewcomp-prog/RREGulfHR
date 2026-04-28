@@ -20,7 +20,9 @@ function parseProjectsFromRows(rows) {
     }
   }
   if (cur) projects.push(cur)
-  return projects
+  // Deduplicate by id — prevents doubles when legacy project_* tabs overlap with Projects tab
+  const seen = new Set()
+  return projects.filter((p) => { if (seen.has(p.id)) return false; seen.add(p.id); return true })
 }
 
 function buildProjectRows(project, candMap) {

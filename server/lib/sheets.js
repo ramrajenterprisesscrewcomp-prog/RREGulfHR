@@ -191,10 +191,13 @@ async function batchReadAll() {
     has('Documents')   && { key: 'documents',    range: 'Documents!A1:ZZ' },
   ].filter(Boolean)
 
-  // Project tabs: unified "Projects" tab OR legacy "project_*" tabs
-  const projectTabNames = allTabNames.filter(
-    (t) => t === 'Projects' || t.startsWith('project_')
-  )
+  // Project tabs: if unified "Projects" tab exists, use ONLY that (migration already done).
+  // If it doesn't exist yet, fall back to legacy "project_*" tabs and migrate them.
+  const hasUnifiedTab = has('Projects')
+  const projectTabNames = hasUnifiedTab
+    ? ['Projects']
+    : allTabNames.filter((t) => t.startsWith('project_'))
+
   const projectRanges = projectTabNames.map((t) => ({ key: `proj:${t}`, range: `${t}!A1:ZZ` }))
 
   const allEntries = [...namedRanges, ...projectRanges]
@@ -224,9 +227,8 @@ async function batchReadAll() {
   const documentRows  = result['documents']  || []
   const projectRows   = projectTabNames.flatMap((t) => result[`proj:${t}`] || [])
 
-  // Step 5: auto-migrate legacy project_* tabs → unified Projects tab
-  const hasLegacy = projectTabNames.some((t) => t.startsWith('project_'))
-  if (hasLegacy && projectRows.length > 0) {
+  // Step 5: if reading from legacy project_* tabs, migrate to unified Projects tab now
+  if (!hasUnifiedTab && projectRows.length > 0) {
     writeTab('Projects', projectRows).catch(() => {})
   }
 
