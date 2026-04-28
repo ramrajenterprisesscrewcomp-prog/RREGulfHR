@@ -195,8 +195,12 @@ function ProjectDetailModal({ project, candidates, onClose, onAddCandidate, onRe
                         </>
                       ) : (
                         <>
-                          <td style={{ ...tdSt, color: '#d1d5db', fontWeight: 600 }}>{role.jobTitle}</td>
-                          <td style={{ ...tdSt, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{role.salary}</td>
+                          <td style={{ ...tdSt, color: role.jobTitle ? '#d1d5db' : '#3a4a5c', fontWeight: 600, fontStyle: role.jobTitle ? 'normal' : 'italic', cursor: 'pointer' }}
+                            onClick={() => { setEditingRoleId(role.id); setEditRoleForm({ jobTitle: role.jobTitle || '', salary: role.salary || '', required: role.required }) }}
+                          >{role.jobTitle || 'click ✏ to add title'}</td>
+                          <td style={{ ...tdSt, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: role.salary ? '#8b95a8' : '#3a4a5c', fontStyle: role.salary ? 'normal' : 'italic', cursor: 'pointer' }}
+                            onClick={() => { setEditingRoleId(role.id); setEditRoleForm({ jobTitle: role.jobTitle || '', salary: role.salary || '', required: role.required }) }}
+                          >{role.salary || 'add salary'}</td>
                           <td style={{ ...tdSt, textAlign: 'center', fontWeight: 700, color: '#d1d5db' }}>{role.required}</td>
                         </>
                       )}
