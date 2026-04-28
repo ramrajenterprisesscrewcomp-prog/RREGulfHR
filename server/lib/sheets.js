@@ -189,6 +189,7 @@ async function batchReadAll() {
     has(CAND_SHEET)    && { key: 'candidates',  range: `${CAND_SHEET}!A${DATA_ROW}:P` },
     has('Interviews')  && { key: 'interviews',   range: 'Interviews!A1:ZZ' },
     has('Documents')   && { key: 'documents',    range: 'Documents!A1:ZZ' },
+    has('Todo')        && { key: 'todos',         range: 'Todo!A1:ZZ' },
   ].filter(Boolean)
 
   // Project tabs: if unified "Projects" tab exists, use ONLY that (migration already done).
@@ -225,6 +226,7 @@ async function batchReadAll() {
   const candRows      = result['candidates'] || []
   const interviewRows = result['interviews'] || []
   const documentRows  = result['documents']  || []
+  const todoRows      = result['todos']      || []
   const projectRows   = projectTabNames.flatMap((t) => result[`proj:${t}`] || [])
 
   // Step 5: if reading from legacy project_* tabs, migrate to unified Projects tab now
@@ -237,6 +239,7 @@ async function batchReadAll() {
     projectRows,
     interviewRows,
     documentRows,
+    todoRows,
   }
 }
 

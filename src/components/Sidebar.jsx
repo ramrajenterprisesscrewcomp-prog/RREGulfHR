@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Calendar, FileText, Star, ChevronRight, X } from 'lucide-react'
+import { LayoutDashboard, Users, Calendar, FileText, Star, ChevronRight, X, CheckSquare } from 'lucide-react'
 import GoogleSyncStatus from './GoogleSyncStatus'
 
 const NAV_ITEMS = [
@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { id: 'candidates', label: 'Candidate Database',  icon: Users           },
   { id: 'interviews', label: 'Interview Schedule',  icon: Calendar        },
   { id: 'documents',  label: 'Documentation',       icon: FileText        },
+  { id: 'todo',       label: 'Task List',            icon: CheckSquare     },
 ]
 
 export default function Sidebar({ candidates, interviews, activeTab, setActiveTab, onCandidateClick, googleSync, onLoadCandidates, isMobile, isOpen, onClose }) {

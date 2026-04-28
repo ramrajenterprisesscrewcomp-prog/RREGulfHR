@@ -14,7 +14,8 @@ function parseProjectsFromRows(rows) {
       cur = { id: row[1], title: row[2], client: row[3], deadline: row[4], notes: row[5], roles: [] }
     } else if (row[0] === 'ROLE' && cur) {
       cur.roles.push({
-        id: row[1], title: row[2], required: Number(row[3]) || 1,
+        id: row[1], jobTitle: row[2] || '', salary: row[7] || '',
+        required: Number(row[3]) || 1,
         roleStatus: row[4], selectedCandidates: row[5] ? row[5].split(',').filter(Boolean) : [],
       })
     }
@@ -29,7 +30,7 @@ function buildProjectRows(project, candMap) {
   const rows = [['PROJECT', project.id, project.title, project.client || '', project.deadline || '', project.notes || '']]
   for (const role of project.roles || []) {
     const names = (role.selectedCandidates || []).map((id) => candMap[id]?.name || id).join(', ')
-    rows.push(['ROLE', role.id, role.title, role.required, role.roleStatus, role.selectedCandidates.join(','), names])
+    rows.push(['ROLE', role.id, role.jobTitle || role.title || '', role.required, role.roleStatus, (role.selectedCandidates || []).join(','), names, role.salary || ''])
   }
   return rows
 }
@@ -48,6 +49,23 @@ function buildInterviewRows(interviews, candMap) {
   for (const iv of interviews) {
     const c = candMap[iv.candidateId]
     rows.push(IV_HEADERS.map((h) => h === 'candidateName' ? (c?.name || iv.candidateName || '') : (iv[h] ?? '')))
+  }
+  return rows
+}
+
+const TODO_HEADERS = ['id','title','description','startDate','endDate','status','priority','createdAt']
+function parseTodosFromRows(rows) {
+  if (rows.length < 2) return []
+  return rows.slice(1).filter((r) => r[0]).map((r) => {
+    const obj = {}
+    TODO_HEADERS.forEach((h, i) => { obj[h] = r[i] ?? '' })
+    return obj
+  })
+}
+function buildTodoRows(todos) {
+  const rows = [TODO_HEADERS]
+  for (const t of todos) {
+    rows.push(TODO_HEADERS.map((h) => t[h] ?? ''))
   }
   return rows
 }
@@ -116,6 +134,7 @@ export function useGoogleSync() {
         candidates: res.candidates || [],
         projects:   parseProjectsFromRows(res.projectRows || []),
         interviews: parseInterviewsFromRows(res.interviewRows || []),
+        todos:      parseTodosFromRows(res.todoRows || []),
         ...parseDocumentsFromRows(res.documentRows || []),
       }
     }), [run])
@@ -192,6 +211,16 @@ export function useGoogleSync() {
       return api.writeTab('Interviews', rows)
     }), [run])
 
+  // ── Todos ─────────────────────────────────────────────────────────────────────
+  const fetchTodos = useCallback(() =>
+    run(async () => {
+      const { data } = await api.readTab('Todo')
+      return parseTodosFromRows(data)
+    }), [run])
+
+  const syncTodos = useCallback((todos) =>
+    run(() => api.writeTab('Todo', buildTodoRows(todos))), [run])
+
   // ── Documents ────────────────────────────────────────────────────────────────
   const fetchDocuments = useCallback(() =>
     run(async () => {
@@ -219,5 +248,6 @@ export function useGoogleSync() {
     syncProjects,
     fetchProjects, fetchInterviews, syncInterviews,
     syncDocuments, fetchDocuments,
+    syncTodos, fetchTodos,
   }
 }

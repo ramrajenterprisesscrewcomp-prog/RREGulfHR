@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard'
 import Candidates from './components/Candidates'
 import Interviews from './components/Interviews'
 import Documents from './components/Documents'
+import Todo from './components/Todo'
 import { initialCandidates, initialInterviews, initialProjects } from './data/mockData'
 import { useGoogleSync } from './hooks/useGoogleSync'
 import GoogleTopBar from './components/GoogleTopBar'
@@ -33,6 +34,7 @@ function AppMain() {
   const [projects,   setProjects]   = useState(() => dedupeById(LS.get('rre_projects',   initialProjects)))
   const [documents,  setDocuments]  = useState(() => LS.get('rre_documents',  []))
   const [docChecklist, setDocChecklist] = useState(() => LS.get('rre_checklist', {}))
+  const [todos, setTodos] = useState(() => LS.get('rre_todos', []))
   const [drawerCandidate, setDrawerCandidate] = useState(null)
   const [candidateFilter, setCandidateFilter] = useState({ status: '', category: '' })
 
@@ -42,6 +44,7 @@ function AppMain() {
   useEffect(() => { LS.set('rre_projects',   projects)   }, [projects])
   useEffect(() => { LS.set('rre_documents',  documents)  }, [documents])
   useEffect(() => { LS.set('rre_checklist',  docChecklist) }, [docChecklist])
+  useEffect(() => { LS.set('rre_todos',      todos)        }, [todos])
 
   // ── Google Sheets + Drive sync ───────────────────────────────────────────────
   const googleSync = useGoogleSync()
@@ -72,12 +75,32 @@ function AppMain() {
     lastFetch.current = now
     googleSync.fetchAll().then((d) => {
       if (!d) return
-      // Always replace with sheet data — even empty arrays — so mock data never persists
+      // Merge sheet projects with localStorage: preserve non-empty jobTitle/salary from local
+      // (sheet may have empty jobTitle if roles were saved before the buildProjectRows fix)
+      const localProjects = LS.get('rre_projects', [])
+      const localProjMap  = Object.fromEntries(localProjects.map((p) => [p.id, p]))
+      const mergedProjects = (d.projects ?? []).map((sp) => {
+        const lp = localProjMap[sp.id]
+        if (!lp) return sp
+        return {
+          ...sp,
+          roles: (sp.roles || []).map((sr) => {
+            const lr = (lp.roles || []).find((r) => r.id === sr.id)
+            if (!lr) return sr
+            return {
+              ...sr,
+              jobTitle: sr.jobTitle || lr.jobTitle || lr.title || '',
+              salary:   sr.salary   || lr.salary   || '',
+            }
+          }),
+        }
+      })
       setCandidates(d.candidates  ?? [])
-      setProjects(d.projects      ?? [])
+      setProjects(mergedProjects)
       setInterviews(d.interviews  ?? [])
       if (d.docs)      setDocuments(d.docs)
       if (d.checklist) setDocChecklist(d.checklist)
+      if (d.todos)     setTodos(d.todos)
     }).catch(() => {})
   }, [googleSync.connected])
 
@@ -247,6 +270,25 @@ function AppMain() {
     })
   }, [googleSync, candidates])
 
+  // ── Todo CRUD + Google Sync ──────────────────────────────────────────────────
+  const handleAddTodo = useCallback((todo) => {
+    const next = [todo, ...todos]
+    setTodos(next)
+    if (googleSync.connected) googleSync.syncTodos(next).catch(console.warn)
+  }, [googleSync, todos])
+
+  const handleUpdateTodo = useCallback((id, updates) => {
+    const next = todos.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    setTodos(next)
+    if (googleSync.connected) googleSync.syncTodos(next).catch(console.warn)
+  }, [googleSync, todos])
+
+  const handleDeleteTodo = useCallback((id) => {
+    const next = todos.filter((t) => t.id !== id)
+    setTodos(next)
+    if (googleSync.connected) googleSync.syncTodos(next).catch(console.warn)
+  }, [googleSync, todos])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#0d1117', fontFamily: 'DM Sans, sans-serif' }}>
       <GoogleTopBar
@@ -328,6 +370,15 @@ function AppMain() {
               const c = candidates.find((x) => x.id === candidateId)
               if (c) { setActiveTab('candidates'); handleOpenDrawer(c) }
             }}
+          />
+        )}
+
+        {activeTab === 'todo' && (
+          <Todo
+            todos={todos}
+            onAdd={handleAddTodo}
+            onUpdate={handleUpdateTodo}
+            onDelete={handleDeleteTodo}
           />
         )}
 
