@@ -19,18 +19,19 @@ function driveEmbedUrl(url) {
 }
 
 function Toast({ message }) {
+  const isWarn = message.startsWith('Click')
   return (
     <div
       className="toast-animate"
       style={{
         position: 'fixed', bottom: 28, right: 28, zIndex: 200,
-        background: '#22c55e', color: '#fff', padding: '12px 20px',
+        background: isWarn ? '#d97706' : '#22c55e', color: '#fff', padding: '12px 20px',
         borderRadius: 10, fontSize: 13, fontWeight: 600,
-        boxShadow: '0 8px 32px rgba(34,197,94,0.35)',
-        display: 'flex', alignItems: 'center', gap: 8,
+        boxShadow: isWarn ? '0 8px 32px rgba(217,119,6,0.35)' : '0 8px 32px rgba(34,197,94,0.35)',
+        display: 'flex', alignItems: 'center', gap: 8, maxWidth: 340,
       }}
     >
-      ✓ {message}
+      {isWarn ? '⚠ ' : '✓ '}{message}
     </div>
   )
 }
@@ -168,9 +169,13 @@ export default function Candidates({
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
+    if (!isDriveAuthorized()) {
+      setToast('Click "Connect Drive" in the top bar first, then upload again.')
+      setTimeout(() => setToast(null), 4000)
+      return
+    }
     setUploadingEdited((prev) => ({ ...prev, [candidate.id]: true }))
     try {
-      if (!isDriveAuthorized()) await authorizeDrive()
       const { url } = await uploadToDrive(file, { jobRole: candidate.role })
       onUpdateCandidate(candidate.id, { edited_resume_url: url })
       setToast('Edited resume uploaded!')
