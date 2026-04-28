@@ -349,6 +349,7 @@ function AppMain() {
           <Candidates
             candidates={candidates}
             interviews={interviews}
+            projects={projects}
             onAddCandidate={handleAddCandidate}
             onUpdateCandidate={handleUpdateCandidate}
             onDeleteCandidate={handleDeleteCandidate}

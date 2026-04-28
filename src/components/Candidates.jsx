@@ -39,6 +39,7 @@ function Toast({ message }) {
 export default function Candidates({
   candidates,
   interviews,
+  projects = [],
   onAddCandidate,
   onUpdateCandidate,
   onDeleteCandidate,
@@ -54,6 +55,7 @@ export default function Candidates({
   const [filterStatus, setFilterStatus] = useState(externalFilter?.status || '')
   const [filterLocation, setFilterLocation] = useState('')
   const [filterDate, setFilterDate] = useState('')
+  const [filterRole, setFilterRole] = useState('')
   const [sortField, setSortField] = useState('date_added')
   const [sortDir, setSortDir] = useState('desc')
   const [showModal, setShowModal]           = useState(false)
@@ -87,6 +89,7 @@ export default function Candidates({
     if (filterCategory) list = list.filter((c) => c.category === filterCategory)
     if (filterStatus) list = list.filter((c) => c.status === filterStatus)
     if (filterLocation) list = list.filter((c) => c.location === filterLocation)
+    if (filterRole) list = list.filter((c) => c.role?.toLowerCase().includes(filterRole.toLowerCase()) || filterRole.toLowerCase().includes(c.role?.toLowerCase() || ''))
     if (dateFrom) list = list.filter((c) => c.date_added >= dateFrom)
 
     list.sort((a, b) => {
@@ -96,13 +99,13 @@ export default function Candidates({
       return sortDir === 'asc' ? cmp : -cmp
     })
     return list
-  }, [candidates, search, filterCategory, filterStatus, filterLocation, dateFrom, sortField, sortDir])
+  }, [candidates, search, filterCategory, filterStatus, filterLocation, filterRole, dateFrom, sortField, sortDir])
 
-  const hasFilter = search || filterCategory || filterStatus || filterLocation || filterDate
+  const hasFilter = search || filterCategory || filterStatus || filterLocation || filterDate || filterRole
 
   const clearAll = () => {
     setSearch(''); setFilterCategory(''); setFilterStatus('')
-    setFilterLocation(''); setFilterDate('')
+    setFilterLocation(''); setFilterDate(''); setFilterRole('')
     onClearExternalFilter()
   }
 
@@ -290,6 +293,16 @@ export default function Candidates({
           <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} style={selectStyle}>
             <option value="">All Locations</option>
             {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+          <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} style={selectStyle}>
+            <option value="">All Project Roles</option>
+            {projects.filter((p) => p.roles?.some((r) => r.jobTitle)).map((p) => (
+              <optgroup key={p.id} label={p.title || p.id}>
+                {p.roles.filter((r) => r.jobTitle).map((r) => (
+                  <option key={r.id} value={r.jobTitle}>{r.jobTitle}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
           <select value={filterDate} onChange={(e) => setFilterDate(e.target.value)} style={selectStyle}>
             <option value="">Any Date</option>
