@@ -169,11 +169,6 @@ export default function Candidates({
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
-    if (!isDriveAuthorized()) {
-      setToast('Click "Connect Drive" in the top bar first, then upload again.')
-      setTimeout(() => setToast(null), 4000)
-      return
-    }
     setUploadingEdited((prev) => ({ ...prev, [candidate.id]: true }))
     try {
       const { url } = await uploadToDrive(file, { jobRole: candidate.role })
@@ -181,9 +176,25 @@ export default function Candidates({
       setToast('Edited resume uploaded!')
       setTimeout(() => setToast(null), 3000)
     } catch (err) {
-      alert(`Upload failed: ${err.message}`)
+      setToast(`Upload failed: ${err.message}`)
+      setTimeout(() => setToast(null), 4000)
     } finally {
       setUploadingEdited((prev) => ({ ...prev, [candidate.id]: false }))
+    }
+  }
+
+  // Called from the upload label click — direct user gesture, so authorizeDrive popup is allowed
+  const handleEditedLabelClick = async (e, c, inputRef) => {
+    e.stopPropagation()
+    if (isDriveAuthorized()) return  // already authed — let label trigger file picker normally
+    e.preventDefault()              // don't open file picker yet
+    try {
+      await authorizeDrive()
+      setToast('Drive connected! Click the upload button again to pick a file.')
+      setTimeout(() => setToast(null), 4000)
+    } catch (err) {
+      setToast(`Drive auth failed: ${err.message}`)
+      setTimeout(() => setToast(null), 4000)
     }
   }
 
@@ -492,8 +503,8 @@ export default function Candidates({
                           </>
                         )}
                         <label
-                          title={c.edited_resume_url ? 'Replace edited resume' : 'Upload edited resume'}
-                          onClick={(e) => e.stopPropagation()}
+                          title={isDriveAuthorized() ? (c.edited_resume_url ? 'Replace edited resume' : 'Upload edited resume') : 'Click to connect Drive, then upload'}
+                          onClick={(e) => handleEditedLabelClick(e, c)}
                           style={{ display: 'flex', alignItems: 'center', padding: '3px 6px', borderRadius: 6, border: `1px solid ${c.edited_resume_url ? 'rgba(34,197,94,0.25)' : 'rgba(79,143,247,0.2)'}`, color: c.edited_resume_url ? '#22c55e' : '#4f8ff7', cursor: 'pointer' }}
                           onMouseEnter={(e) => e.currentTarget.style.opacity = '0.75'}
                           onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
