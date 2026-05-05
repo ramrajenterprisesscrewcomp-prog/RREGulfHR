@@ -1,126 +1,414 @@
-import { useState, useEffect, useCallback } from 'react'
-import CandidateDatabase from './components/CandidateDatabase.jsx'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Sidebar from './components/Sidebar'
+import Dashboard from './components/Dashboard'
+import Candidates from './components/Candidates'
+import Interviews from './components/Interviews'
+import Documents from './components/Documents'
+import Todo from './components/Todo'
+import { initialCandidates, initialInterviews, initialProjects } from './data/mockData'
+import { useGoogleSync } from './hooks/useGoogleSync'
+import GoogleTopBar from './components/GoogleTopBar'
+import { useIsMobile } from './hooks/useWindowSize'
 
-const LOGIN_EMAIL = import.meta.env.VITE_LOGIN_EMAIL
-const LOGIN_PASS = import.meta.env.VITE_LOGIN_PASS
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+// ── localStorage helpers ──────────────────────────────────────────────────────
+const LS = {
+  get: (key, fallback) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback } },
+  set: (key, val)      => { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} },
+}
+
+function dedupeById(arr) {
+  const seen = new Set()
+  return (arr || []).filter((x) => { if (!x?.id || seen.has(x.id)) return false; seen.add(x.id); return true })
+}
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(() => sessionStorage.getItem('rre_auth') === 'ok')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [accessToken, setAccessToken] = useState(null)
-  const [tokenClient, setTokenClient] = useState(null)
+  return <AppMain />
+}
 
+function AppMain() {
+  const isMobile = useIsMobile()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [candidates, setCandidates] = useState(() => dedupeById(LS.get('rre_candidates', initialCandidates)))
+  const [interviews, setInterviews] = useState(() => dedupeById(LS.get('rre_interviews', initialInterviews)))
+  const [projects,   setProjects]   = useState(() => dedupeById(LS.get('rre_projects',   initialProjects)))
+  const [documents,  setDocuments]  = useState(() => LS.get('rre_documents',  []))
+  const [docChecklist, setDocChecklist] = useState(() => LS.get('rre_checklist', {}))
+  const [todos, setTodos] = useState(() => LS.get('rre_todos', []))
+  const [drawerCandidate, setDrawerCandidate] = useState(null)
+  const [candidateFilter, setCandidateFilter] = useState({ status: '', category: '' })
+
+  // ── Auto-save to localStorage on every change ────────────────────────────────
+  useEffect(() => { LS.set('rre_candidates', candidates) }, [candidates])
+  useEffect(() => { LS.set('rre_interviews', interviews) }, [interviews])
+  useEffect(() => { LS.set('rre_projects',   projects)   }, [projects])
+  useEffect(() => { LS.set('rre_documents',  documents)  }, [documents])
+  useEffect(() => { LS.set('rre_checklist',  docChecklist) }, [docChecklist])
+  useEffect(() => { LS.set('rre_todos',      todos)        }, [todos])
+
+  // ── Google Sheets + Drive sync ───────────────────────────────────────────────
+  const googleSync = useGoogleSync()
+
+  // Called by GoogleTopBar after connect: replace local state with sheet data
+  const handleLoadCandidates = useCallback((sheetCandidates) => {
+    setCandidates(sheetCandidates)
+    setDrawerCandidate(null)
+  }, [])
+  const handleLoadProjects   = useCallback((p)   => setProjects(p),   [])
+  const handleLoadInterviews = useCallback((ivs) => setInterviews(ivs), [])
+  const handleLoadDocuments  = useCallback((result) => {
+    // result can be { docs, checklist } from sheet, or a plain array (local)
+    if (Array.isArray(result)) { setDocuments(result); return }
+    if (result?.docs)      setDocuments(result.docs)
+    if (result?.checklist) setDocChecklist(result.checklist)
+  }, [])
+
+  // ── Auto-load all data on connect — single batchGet, 60s throttle ───────────
+  const mainRef      = useRef(null)
+  const autoLoadDone = useRef(false)
+  const lastFetch    = useRef(0)
   useEffect(() => {
-    if (!loggedIn) return
-    const init = () => {
-      if (!window.google?.accounts?.oauth2) return
-      const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/spreadsheets',
-        callback: (res) => {
-          if (res.access_token) setAccessToken(res.access_token)
-        },
+    if (!googleSync.connected) { autoLoadDone.current = false; return }
+    if (autoLoadDone.current) return
+    const now = Date.now()
+    if (now - lastFetch.current < 60_000) return   // throttle: max once per minute
+    autoLoadDone.current = true
+    lastFetch.current = now
+    googleSync.fetchAll().then((d) => {
+      if (!d) return
+      // Merge sheet projects with localStorage: preserve non-empty jobTitle/salary from local
+      // (sheet may have empty jobTitle if roles were saved before the buildProjectRows fix)
+      const localProjects = LS.get('rre_projects', [])
+      const localProjMap  = Object.fromEntries(localProjects.map((p) => [p.id, p]))
+      const mergedProjects = (d.projects ?? []).map((sp) => {
+        const lp = localProjMap[sp.id]
+        if (!lp) return sp
+        return {
+          ...sp,
+          roles: (sp.roles || []).map((sr) => {
+            const lr = (lp.roles || []).find((r) => r.id === sr.id)
+            if (!lr) return sr
+            return {
+              ...sr,
+              jobTitle: sr.jobTitle || lr.jobTitle || lr.title || '',
+              salary:   sr.salary   || lr.salary   || '',
+            }
+          }),
+        }
       })
-      setTokenClient(client)
-      client.requestAccessToken({ prompt: '' })
-    }
-    if (window.google?.accounts?.oauth2) {
-      init()
-    } else {
-      const iv = setInterval(() => {
-        if (window.google?.accounts?.oauth2) { init(); clearInterval(iv) }
-      }, 300)
-      return () => clearInterval(iv)
-    }
-  }, [loggedIn])
+      setCandidates(d.candidates  ?? [])
+      setProjects(mergedProjects)
+      setInterviews(d.interviews  ?? [])
+      if (d.docs)      setDocuments(d.docs)
+      if (d.checklist) setDocChecklist(d.checklist)
+      if (d.todos)     setTodos(d.todos)
+    }).catch(() => {})
+  }, [googleSync.connected])
 
-  const handleLogin = (e) => {
-    e.preventDefault()
-    if (email.trim() === LOGIN_EMAIL && password === LOGIN_PASS) {
-      sessionStorage.setItem('rre_auth', 'ok')
-      setLoggedIn(true)
-      setLoginError('')
-    } else {
-      setLoginError('Invalid email or password')
+  // ── Scroll to top on tab change ──────────────────────────────────────────────
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }) }, [activeTab])
+
+  // ── Navigation ───────────────────────────────────────────────────────────────
+  const handleNavigateToCandidates = useCallback((filter) => {
+    setActiveTab('candidates')
+    setCandidateFilter(filter)
+    setDrawerCandidate(null)
+  }, [])
+
+  const handleNavigateToInterviews = useCallback(() => {
+    setActiveTab('interviews')
+    setDrawerCandidate(null)
+  }, [])
+
+  // ── Drawer ───────────────────────────────────────────────────────────────────
+  const handleOpenDrawer  = useCallback((candidate) => setDrawerCandidate(candidate), [])
+  const handleCloseDrawer = useCallback(() => setDrawerCandidate(null), [])
+
+  // ── Candidate CRUD + Google Sync ─────────────────────────────────────────────
+  const handleAddCandidate = useCallback((candidate, file) => {
+    const { _resumeFile, ...clean } = candidate
+    const actualFile = file || _resumeFile || null
+    setCandidates((prev) => [clean, ...prev])
+    if (googleSync.connected) {
+      googleSync.syncAdd(clean, actualFile).then((synced) => {
+        if (synced?.resume_url && synced.resume_url !== clean.resume_url) {
+          setCandidates((prev) =>
+            prev.map((c) => (c.id === synced.id ? { ...c, resume_url: synced.resume_url } : c))
+          )
+        }
+      }).catch(console.warn)
     }
-  }
+  }, [googleSync])
 
-  const requestToken = useCallback(() => {
-    if (tokenClient) tokenClient.requestAccessToken({ prompt: '' })
-  }, [tokenClient])
+  const handleUpdateCandidate = useCallback((id, updates) => {
+    // Build fullCandidate from the current candidates array (not from the setState updater,
+    // which runs asynchronously in React 18 concurrent mode and would be null by sync time)
+    const existing = candidates.find((c) => c.id === id)
+    if (!existing) return
+    const fullCandidate = { ...existing, ...updates }
 
-  if (!loggedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#0d1117' }}>
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-3" style={{ background: '#4f8ff7' }}>
-              <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-white">RRE HR</h1>
-            <p className="text-sm mt-1" style={{ color: '#8b949e' }}>Consultancy Dashboard</p>
-          </div>
-          <form onSubmit={handleLogin} className="rounded-2xl p-6 flex flex-col gap-4" style={{ background: '#111620', border: '1px solid #1e2533' }}>
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: '#c9d1d9' }}>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                style={{ background: '#0d1117', border: '1px solid #1e2533', color: '#e6edf3', '--tw-ring-color': '#4f8ff7' }}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: '#c9d1d9' }}>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                style={{ background: '#0d1117', border: '1px solid #1e2533', color: '#e6edf3' }}
-                required
-              />
-            </div>
-            {loginError && (
-              <p className="text-sm" style={{ color: '#f85149' }}>{loginError}</p>
-            )}
-            <button
-              type="submit"
-              className="w-full py-2 rounded-lg font-semibold text-white transition-all hover:opacity-90 active:scale-95"
-              style={{ background: '#4f8ff7' }}
-            >
-              Sign In
-            </button>
-          </form>
-        </div>
-      </div>
-    )
-  }
+    setCandidates((prev) => prev.map((c) => (c.id !== id ? c : fullCandidate)))
+    setDrawerCandidate((prev) => (prev?.id === id ? { ...prev, ...updates } : prev))
+
+    if (googleSync.connected) {
+      googleSync.syncUpdate(id, fullCandidate).catch(console.warn)
+    }
+  }, [googleSync, candidates])
+
+  const handleDeleteCandidate = useCallback((id) => {
+    setCandidates((prev) => prev.filter((c) => c.id !== id))
+    setDrawerCandidate((prev) => (prev?.id === id ? null : prev))
+
+    if (googleSync.connected) {
+      googleSync.syncDelete(id).catch(console.warn)
+    }
+  }, [googleSync])
+
+  // ── Bulk add (from BulkUploadModal) ─────────────────────────────────────────
+  const handleBulkAdd = useCallback((newCandidates) => {
+    // Strip _resumeFile, add to state immediately
+    const clean = newCandidates.map(({ _resumeFile, ...c }) => c)
+    setCandidates((prev) => [...clean, ...prev])
+
+    // Sync all to Sheets + Drive in background
+    if (googleSync.connected) {
+      googleSync.syncAddMany(newCandidates).then((synced) => {
+        // Update any candidates whose resume_url changed (Drive upload)
+        setCandidates((prev) =>
+          prev.map((c) => {
+            const s = synced.find((x) => x.id === c.id)
+            return s && s.resume_url !== c.resume_url ? { ...c, resume_url: s.resume_url } : c
+          })
+        )
+      }).catch(console.warn)
+    }
+  }, [googleSync])
+
+  // ── Project CRUD + Google Sync ───────────────────────────────────────────────
+  const handleAddProject = useCallback((project) => {
+    const next = [project, ...projects]
+    setProjects(next)
+    if (googleSync.connected) googleSync.syncProjects(next, candidates).catch(console.warn)
+  }, [googleSync, candidates, projects])
+
+  const handleUpdateProject = useCallback((projectId, roleId, updates) => {
+    const next = projects.map((p) => {
+      if (p.id !== projectId) return p
+      return {
+        ...p,
+        roles: roleId ? p.roles.map((r) => (r.id === roleId ? { ...r, ...updates } : r)) : p.roles,
+        ...(roleId ? {} : updates),
+      }
+    })
+    setProjects(next)
+    if (googleSync.connected) googleSync.syncProjects(next, candidates).catch(console.warn)
+  }, [googleSync, candidates, projects])
+
+  const handleAddCandidateToRole = useCallback((projectId, roleId, candidateId) => {
+    const next = projects.map((p) => {
+      if (p.id !== projectId) return p
+      return {
+        ...p,
+        roles: p.roles.map((r) => {
+          if (r.id !== roleId) return r
+          if (r.selectedCandidates.includes(candidateId)) return r
+          const sel = [...r.selectedCandidates, candidateId]
+          return { ...r, selectedCandidates: sel, roleStatus: sel.length >= r.required ? 'Filled' : 'In Progress' }
+        }),
+      }
+    })
+    setProjects(next)
+    if (googleSync.connected) googleSync.syncProjects(next, candidates).catch(console.warn)
+  }, [googleSync, candidates, projects])
+
+  const handleRemoveCandidateFromRole = useCallback((projectId, roleId, candidateId) => {
+    const next = projects.map((p) => {
+      if (p.id !== projectId) return p
+      return {
+        ...p,
+        roles: p.roles.map((r) => {
+          if (r.id !== roleId) return r
+          const sel = r.selectedCandidates.filter((id) => id !== candidateId)
+          return { ...r, selectedCandidates: sel, roleStatus: sel.length >= r.required ? 'Filled' : sel.length > 0 ? 'In Progress' : 'Open' }
+        }),
+      }
+    })
+    setProjects(next)
+    if (googleSync.connected) googleSync.syncProjects(next, candidates).catch(console.warn)
+  }, [googleSync, candidates, projects])
+
+  const handleAddRole = useCallback((projectId, role) => {
+    const next = projects.map((p) => p.id !== projectId ? p : { ...p, roles: [...p.roles, role] })
+    setProjects(next)
+    if (googleSync.connected) googleSync.syncProjects(next, candidates).catch(console.warn)
+  }, [googleSync, candidates, projects])
+
+  const handleDeleteRole = useCallback((projectId, roleId) => {
+    const next = projects.map((p) => p.id !== projectId ? p : { ...p, roles: p.roles.filter((r) => r.id !== roleId) })
+    setProjects(next)
+    if (googleSync.connected) googleSync.syncProjects(next, candidates).catch(console.warn)
+  }, [googleSync, candidates, projects])
+
+  // ── Interview CRUD + Google Sync ─────────────────────────────────────────────
+  const handleAddInterview = useCallback((iv) => {
+    setInterviews((prev) => {
+      const next = [iv, ...prev]
+      if (googleSync.connected) googleSync.syncInterviews(next, candidates).catch(console.warn)
+      return next
+    })
+  }, [googleSync, candidates])
+
+  const handleUpdateInterview = useCallback((id, updates) => {
+    setInterviews((prev) => {
+      const next = prev.map((i) => (i.id === id ? { ...i, ...updates } : i))
+      if (googleSync.connected) googleSync.syncInterviews(next, candidates).catch(console.warn)
+      return next
+    })
+  }, [googleSync, candidates])
+
+  const handleDeleteInterview = useCallback((id) => {
+    setInterviews((prev) => {
+      const next = prev.filter((i) => i.id !== id)
+      if (googleSync.connected) googleSync.syncInterviews(next, candidates).catch(console.warn)
+      return next
+    })
+  }, [googleSync, candidates])
+
+  // ── Todo CRUD + Google Sync ──────────────────────────────────────────────────
+  const handleAddTodo = useCallback((todo) => {
+    const next = [todo, ...todos]
+    setTodos(next)
+    if (googleSync.connected) googleSync.syncTodos(next).catch(console.warn)
+  }, [googleSync, todos])
+
+  const handleUpdateTodo = useCallback((id, updates) => {
+    const next = todos.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    setTodos(next)
+    if (googleSync.connected) googleSync.syncTodos(next).catch(console.warn)
+  }, [googleSync, todos])
+
+  const handleDeleteTodo = useCallback((id) => {
+    const next = todos.filter((t) => t.id !== id)
+    setTodos(next)
+    if (googleSync.connected) googleSync.syncTodos(next).catch(console.warn)
+  }, [googleSync, todos])
 
   return (
-    <div className="flex flex-col" style={{ minHeight: '100vh', background: '#0d1117' }}>
-      <nav className="flex items-center justify-between px-6 py-3 border-b" style={{ background: '#111620', borderColor: '#1e2533' }}>
-        <span className="font-bold text-white text-lg">RRE HR</span>
-        <button
-          onClick={() => { sessionStorage.removeItem('rre_auth'); setLoggedIn(false); setAccessToken(null) }}
-          className="text-sm transition-colors hover:text-white"
-          style={{ color: '#8b949e' }}
-        >
-          Sign out
-        </button>
-      </nav>
-      <div className="flex-1 overflow-hidden">
-        <CandidateDatabase accessToken={accessToken} onRequestToken={requestToken} />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#0d1117', fontFamily: 'DM Sans, sans-serif' }}>
+      <GoogleTopBar
+        sync={googleSync}
+        candidates={candidates}
+        onLoadCandidates={handleLoadCandidates}
+        onLoadProjects={handleLoadProjects}
+        onLoadInterviews={handleLoadInterviews}
+        onLoadDocuments={handleLoadDocuments}
+        onMenuClick={() => setSidebarOpen(o => !o)}
+        isMobile={isMobile}
+      />
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {/* Mobile overlay */}
+        {isMobile && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 199, backdropFilter: 'blur(2px)' }}
+          />
+        )}
+
+      <Sidebar
+        candidates={candidates}
+        interviews={interviews}
+        activeTab={activeTab}
+        setActiveTab={(tab) => { setActiveTab(tab); setDrawerCandidate(null); if (isMobile) setSidebarOpen(false) }}
+        onCandidateClick={handleOpenDrawer}
+        googleSync={googleSync}
+        onLoadCandidates={handleLoadCandidates}
+        isMobile={isMobile}
+        isOpen={isMobile ? sidebarOpen : true}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      <main ref={mainRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative', marginLeft: isMobile ? 0 : 0 }}>
+        {activeTab === 'dashboard' && (
+          <Dashboard
+            candidates={candidates}
+            interviews={interviews}
+            projects={projects}
+            onAddProject={handleAddProject}
+            onUpdateProject={handleUpdateProject}
+            onAddRole={handleAddRole}
+            onDeleteRole={handleDeleteRole}
+            onAddCandidateToRole={handleAddCandidateToRole}
+            onRemoveCandidateFromRole={handleRemoveCandidateFromRole}
+            onNavigateToCandidates={handleNavigateToCandidates}
+            onNavigateToInterviews={handleNavigateToInterviews}
+          />
+        )}
+
+        {activeTab === 'candidates' && (
+          <Candidates
+            candidates={candidates}
+            interviews={interviews}
+            projects={projects}
+            onAddCandidate={handleAddCandidate}
+            onUpdateCandidate={handleUpdateCandidate}
+            onDeleteCandidate={handleDeleteCandidate}
+            onAddInterview={handleAddInterview}
+            externalFilter={candidateFilter}
+            onClearExternalFilter={() => setCandidateFilter({ status: '', category: '' })}
+            drawerCandidate={drawerCandidate}
+            onOpenDrawer={handleOpenDrawer}
+            onCloseDrawer={handleCloseDrawer}
+            googleSyncing={googleSync.syncing}
+          />
+        )}
+
+        {activeTab === 'interviews' && (
+          <Interviews
+            candidates={candidates}
+            interviews={interviews}
+            onAddInterview={handleAddInterview}
+            onUpdateInterview={handleUpdateInterview}
+            onDeleteInterview={handleDeleteInterview}
+            onUpdateCandidate={handleUpdateCandidate}
+            onCandidateClick={(candidateId) => {
+              const c = candidates.find((x) => x.id === candidateId)
+              if (c) { setActiveTab('candidates'); handleOpenDrawer(c) }
+            }}
+          />
+        )}
+
+        {activeTab === 'todo' && (
+          <Todo
+            todos={todos}
+            onAdd={handleAddTodo}
+            onUpdate={handleUpdateTodo}
+            onDelete={handleDeleteTodo}
+          />
+        )}
+
+        {activeTab === 'documents' && (
+          <Documents
+            candidates={candidates}
+            documents={documents}
+            docChecklist={docChecklist}
+            onAddDocument={(doc) => {
+              const next = [doc, ...documents]
+              setDocuments(next)
+              if (googleSync.connected) googleSync.syncDocuments(next, docChecklist).catch(console.warn)
+            }}
+            onToggleDocCheck={(candidateId, docType, checked) => {
+              const next = {
+                ...docChecklist,
+                [candidateId]: { ...(docChecklist[candidateId] || {}), [docType]: checked },
+              }
+              setDocChecklist(next)
+              if (googleSync.connected) googleSync.syncDocuments(documents, next).catch(console.warn)
+            }}
+            googleSync={googleSync}
+          />
+        )}
+      </main>
       </div>
     </div>
   )

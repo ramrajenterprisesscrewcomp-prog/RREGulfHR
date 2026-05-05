@@ -8,27 +8,151 @@
 
 body {
   margin: 0;
-  background-color: #0d1117;
-  color: #e6edf3;
+  background: #0d1117;
+  color: #d1d5db;
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #111620;
+  background: #0d1117;
 }
 ::-webkit-scrollbar-thumb {
   background: #1e2533;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2d3748;
+  background: #2e3a50;
 }
 
-/* Thin top scrollbar */
-.top-scroll::-webkit-scrollbar {
-  height: 4px;
+/* Remove default input/select styles for dark theme */
+input, select, textarea {
+  outline: none;
+}
+
+/* Smooth transitions for interactive elements */
+button, a {
+  transition: all 0.15s ease;
+}
+
+/* Table row hover */
+.table-row-hover:hover {
+  background: rgba(79, 143, 247, 0.04);
+  cursor: pointer;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #4f8ff7 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card glow on hover */
+.card-glow:hover {
+  box-shadow: 0 0 0 1px rgba(79, 143, 247, 0.2), 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Pulse animation for live badge */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse-dot {
+  animation: pulse-dot 2s infinite;
+}
+
+/* Slide in from right */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.slide-in-right {
+  animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Fade in */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+/* Progress bar fill animation */
+@keyframes fillBar {
+  from { width: 0; }
+}
+.fill-bar {
+  animation: fillBar 0.8s ease-out;
+}
+
+/* Toast notification */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast-animate {
+  animation: toastIn 0.3s ease-out;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+
+/* Touch targets */
+@media (max-width: 767px) {
+  button { min-height: 36px; }
+  input, select, textarea { font-size: 16px !important; } /* prevent iOS zoom */
+}
+
+/* Scrollable table wrapper */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Responsive grid: 2 cols on tablet, 1 on mobile */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1023px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 767px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+}
+
+/* Page padding responsive */
+.page-pad {
+  padding: 24px 28px;
+}
+@media (max-width: 1023px) {
+  .page-pad { padding: 18px 18px; }
+}
+@media (max-width: 767px) {
+  .page-pad { padding: 14px 12px; }
+}
+
+/* Modal full screen on mobile */
+@media (max-width: 767px) {
+  .modal-responsive {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* Hide text labels on very small screens */
+@media (max-width: 380px) {
+  .hide-xs { display: none !important; }
 }
